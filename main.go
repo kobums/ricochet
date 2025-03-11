@@ -32,6 +32,93 @@ type GameState struct {
 
 var game GameState
 
+var oneBoard = []Position{
+	{12, 1}, {6, 5}, {10, 7}, {6, 9}, {10, 11},
+	{7, 4}, {1, 8}, {5, 8}, {11, 8}, {9, 12},
+}
+
+var twoBoard = []Position{
+	{1, 12}, {3, 4}, {5, 10}, {13, 4}, {15, 10},
+	{2, 3}, {6, 9}, {8, 1}, {14, 5}, {14, 11},
+}
+
+var threeBoard = []Position{
+	{12, 1}, {6, 5}, {10, 7}, {6, 9}, {10, 11},
+	{7, 4}, {1, 8}, {5, 8}, {11, 8}, {9, 12},
+}
+
+var fourBoard = []Position{
+	{4, 1}, {6, 3}, {2, 9}, {10,  13}, {14, 7},
+	{1, 12}, {3, 10}, {7, 2}, {9, 12}, {13, 8},
+}
+
+var centerWall = []Position{
+	{14, 15}, {14, 17}, {18, 15}, {18, 17}, {15, 14}, {17, 14}, {15, 18}, {17, 18},
+}
+
+var centerBoard = []Position{
+	{15, 15}, {15, 17}, {17, 15}, {17, 17},
+}
+
+func transformPosition(p Position, index int) Position {
+	switch index {
+	case 1:
+		return p // 1사분면: 그대로 유지
+	case 2:
+		return Position{GRID_SIZE - p.Y - 1, p.X} // 2사분면 변환
+	case 3:
+		return Position{p.Y, GRID_SIZE - p.X - 1} // 3사분면 변환
+	case 4:
+		return Position{GRID_SIZE - p.X - 1, GRID_SIZE - p.Y - 1} // 4사분면 변환
+	default:
+		return p // 기본값: 변화 없음
+	}
+}
+
+// 보드를 4개의 사분면으로 나눈 후 섞기 (벽도 함께 이동)
+func shuffleQuadrants() {
+	rand.Seed(time.Now().UnixNano())
+
+	// 사분면의 순서를 랜덤하게 섞음
+	quadrantOrder := []int{1, 2, 3, 4}
+	rand.Shuffle(len(quadrantOrder), func(i, j int) { quadrantOrder[i], quadrantOrder[j] = quadrantOrder[j], quadrantOrder[i] })
+
+	newWalls := make([]Position, len(oneBoard)*4)
+
+	// 기존 사분면 벽을 변환하여 newWalls에 추가
+	for i, newQ := range quadrantOrder {
+		var boardToUse []Position
+
+		// 각 사분면에 해당하는 벽 데이터 선택
+		switch newQ {
+		case 1:
+			boardToUse = oneBoard
+		case 2:
+			boardToUse = twoBoard
+		case 3:
+			boardToUse = threeBoard
+		case 4:
+			boardToUse = fourBoard
+		}
+
+		// 변환된 벽 좌표 추가
+		for _, p := range boardToUse {
+			newWalls = append(newWalls, transformPosition(p, i+1))
+		}
+	}
+
+	// 기존 보드를 초기화하고 새로운 벽 설정
+	for y := 1; y < GRID_SIZE-1; y++ {
+		for x := 1; x < GRID_SIZE-1; x++ {
+			game.Board[y][x] = Cell{IsWall: false}
+		}
+	}
+	for _, w := range newWalls {
+		game.Board[w.Y][w.X] = Cell{IsWall: true}
+	}
+}
+
+
 // 초기 보드 및 로봇 세팅
 func initializeGame() {
 	// 보드 초기화: 짝수 좌표는 벽, 홀수 좌표는 이동 공간
@@ -47,15 +134,14 @@ func initializeGame() {
 		}
 	}
 
-	centerWalls := []struct {
-		X, Y int
-	}{
-		// {2, 12}, {0, 20}, {2, 28}, {4, 6}, {6, 22}, {8, 10}, {10, 6}, {12, 6}, {14, 28},
-		{12, 1}, {20, 1}, {28, 3}, {6,5}, {22, 5}, {10, 7}, {6, 9}, {10, 11}, {28, 13}, {22, 15}, {22, 19}, {8, 21}, {12, 23}, {30, 23}, {4, 25}, {18, 25}, {8, 27}, {26, 29}, {8, 31}, {28, 31},
-		{29, 2}, {7,4}, {23, 6}, {1, 8}, {5, 8}, {11, 8}, {31, 8}, {9, 12}, {21, 14}, {27, 14},{1, 20}, {23, 20}, {31, 20}, {7, 22}, {11, 22}, {29, 22}, {19, 24}, {5, 26}, {9, 26}, {25, 30},
-		{14, 15}, {14, 17}, {18, 15}, {18, 17}, {15, 14}, {17, 14}, {15, 18}, {17, 18}, // centerWall
+	// 기본 벽 추가 후 사분면 섞기
+	shuffleQuadrants()
+
+	for _, w := range centerWall {
+		game.Board[w.Y][w.X] = Cell{IsWall: true}
 	}
-	for _, w := range centerWalls {
+
+	for _, w := range centerBoard {
 		game.Board[w.Y][w.X] = Cell{IsWall: true}
 	}
 
